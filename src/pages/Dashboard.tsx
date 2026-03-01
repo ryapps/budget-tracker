@@ -33,51 +33,69 @@ export default function Dashboard() {
   // Quick Add State
   const [quickAmount, setQuickAmount] = useState('');
   const [quickType, setQuickType] = useState<'income' | 'expense'>('expense');
+  const [quickCategoryId, setQuickCategoryId] = useState<string>('');
+  const [quickAccountId, setQuickAccountId] = useState<string>('');
   const amountInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     amountInputRef.current?.focus();
   }, []);
 
+  useEffect(() => {
+    if (!categories || categories.length === 0) return;
+
+    let optimalId = '';
+    if (quickType === 'income' && lastUsedIncomeCatMeta?.value) {
+      optimalId = lastUsedIncomeCatMeta.value as string;
+    } else if (quickType === 'expense' && lastUsedExpenseCatMeta?.value) {
+      optimalId = lastUsedExpenseCatMeta.value as string;
+    }
+    
+    if (!optimalId || !categories.find(c => c.id === optimalId)) {
+      const fallback = categories.find(c => c.type === quickType || c.type === 'both');
+      if (fallback) optimalId = fallback.id;
+    }
+
+    const currentCat = categories.find(c => c.id === quickCategoryId);
+    const isCurrentValid = currentCat && (currentCat.type === quickType || currentCat.type === 'both');
+    
+    if (!isCurrentValid || !quickCategoryId) {
+      setQuickCategoryId(optimalId);
+    }
+  }, [quickType, categories, quickCategoryId, lastUsedIncomeCatMeta, lastUsedExpenseCatMeta]);
+
+  useEffect(() => {
+    if (!accounts || accounts.length === 0) return;
+    const currentAcc = accounts.find(a => a.id === quickAccountId);
+    if (!currentAcc || !quickAccountId) {
+      let optimalId = '';
+      if (lastUsedAccountMeta?.value && accounts.find(a => a.id === lastUsedAccountMeta.value)) {
+        optimalId = lastUsedAccountMeta.value as string;
+      } else {
+        optimalId = accounts[0].id;
+      }
+      setQuickAccountId(optimalId);
+    }
+  }, [accounts, quickAccountId, lastUsedAccountMeta]);
+
   const getCategoryById = (id: string) => categories?.find((c) => c.id === id);
   const getAccountById = (id: string) => accounts?.find((a) => a.id === id);
 
   const handleQuickAdd = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!quickAmount || !categories || !accounts) return;
-
-    const amountNum = parseInt(quickAmount.replace(/\D/g, ''), 10);
-    if (!amountNum) return;
-
-    let defaultCategoryId = '';
-    if (quickType === 'income' && lastUsedIncomeCatMeta?.value) {
-      defaultCategoryId = lastUsedIncomeCatMeta.value as string;
-    } else if (quickType === 'expense' && lastUsedExpenseCatMeta?.value) {
-      defaultCategoryId = lastUsedExpenseCatMeta.value as string;
-    }
-
-    if (!defaultCategoryId || !categories.find(c => c.id === defaultCategoryId)) {
-      const fallback = categories.find(c => c.type === quickType || c.type === 'both');
-      if (fallback) defaultCategoryId = fallback.id;
-    }
-
-    let defaultAccountId = '';
-    if (lastUsedAccountMeta?.value && accounts.find(a => a.id === lastUsedAccountMeta.value)) {
-      defaultAccountId = lastUsedAccountMeta.value as string;
-    } else if (accounts.length > 0) {
-      defaultAccountId = accounts[0].id;
-    }
-
-    if (!defaultCategoryId || !defaultAccountId) {
+    if (!quickAmount || !categories || !accounts || !quickCategoryId || !quickAccountId) {
       alert('Kategori atau akun belum tersedia!');
       return;
     }
 
+    const amountNum = parseInt(quickAmount.replace(/\D/g, ''), 10);
+    if (!amountNum) return;
+
     await addTransaction({
       amount: amountNum,
       type: quickType,
-      categoryId: defaultCategoryId,
-      accountId: defaultAccountId,
+      categoryId: quickCategoryId,
+      accountId: quickAccountId,
       date: getTodayDate(),
       note: 'Quick Add',
     });
@@ -184,59 +202,108 @@ export default function Dashboard() {
         <div style={{ marginBottom: 'var(--spacing-md)', fontWeight: 600, fontSize: 'var(--font-sm)', color: 'var(--text-secondary)' }}>
           Quick Add ({quickType === 'expense' ? 'Pengeluaran' : 'Pemasukan'})
         </div>
-        <form onSubmit={handleQuickAdd} style={{ display: 'flex', gap: 'var(--spacing-sm)' }}>
-          <button 
-            type="button"
-            onClick={() => setQuickType(quickType === 'expense' ? 'income' : 'expense')}
-            style={{ 
-              width: '40px', 
-              height: '40px', 
-              borderRadius: 'var(--radius-md)', 
-              background: quickType === 'expense' ? 'var(--accent-red-dim)' : 'var(--accent-green-dim)',
-              color: quickType === 'expense' ? 'var(--accent-red)' : 'var(--accent-green)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              flexShrink: 0
-            }}
-          >
-            {quickType === 'expense' ? '−' : '+'}
-          </button>
-          <input 
-            ref={amountInputRef}
-            type="text" 
-            inputMode="numeric"
-            placeholder="Rp 0" 
-            value={quickAmount ? formatRupiah(parseInt(quickAmount.replace(/\D/g, ''), 10) || 0) : ''}
-            onChange={(e) => setQuickAmount(e.target.value.replace(/\D/g, ''))}
-            style={{ 
-              flex: 1, 
-              minWidth: 0,
-              background: 'var(--bg-surface)', 
-              border: '1px solid var(--border-color)', 
-              borderRadius: 'var(--radius-md)', 
-              padding: '0 var(--spacing-md)',
-              color: quickType === 'income' ? 'var(--accent-green)' : 'var(--accent-red)',
-              fontSize: 'var(--font-lg)',
-              fontWeight: 700,
-              textAlign: 'center'
-            }}
-          />
-          <button 
-            type="submit"
-            disabled={!quickAmount}
-            style={{
-              padding: '0 var(--spacing-md)',
-              borderRadius: 'var(--radius-md)',
-              background: 'var(--text-primary)',
-              color: 'var(--bg-primary)',
-              fontWeight: 600,
-              opacity: quickAmount ? 1 : 0.5,
-              transition: 'all var(--transition-fast)'
-            }}
-          >
-            Simpan
-          </button>
+        <form onSubmit={handleQuickAdd} style={{ display: 'flex', flexDirection: 'column', gap: 'var(--spacing-sm)' }}>
+          <div style={{ display: 'flex', gap: 'var(--spacing-sm)' }}>
+            <button 
+              type="button"
+              onClick={() => setQuickType(quickType === 'expense' ? 'income' : 'expense')}
+              style={{ 
+                width: '40px', 
+                height: '40px', 
+                borderRadius: 'var(--radius-md)', 
+                background: quickType === 'expense' ? 'var(--accent-red-dim)' : 'var(--accent-green-dim)',
+                color: quickType === 'expense' ? 'var(--accent-red)' : 'var(--accent-green)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                flexShrink: 0
+              }}
+            >
+              {quickType === 'expense' ? '−' : '+'}
+            </button>
+            <input 
+              ref={amountInputRef}
+              type="text" 
+              inputMode="numeric"
+              placeholder="Rp 0" 
+              value={quickAmount ? formatRupiah(parseInt(quickAmount.replace(/\D/g, ''), 10) || 0) : ''}
+              onChange={(e) => setQuickAmount(e.target.value.replace(/\D/g, ''))}
+              style={{ 
+                flex: 1, 
+                minWidth: 0,
+                background: 'var(--bg-surface)', 
+                border: '1px solid var(--border-color)', 
+                borderRadius: 'var(--radius-md)', 
+                padding: '0 var(--spacing-md)',
+                color: quickType === 'income' ? 'var(--accent-green)' : 'var(--accent-red)',
+                fontSize: 'var(--font-lg)',
+                fontWeight: 700,
+                textAlign: 'center'
+              }}
+            />
+            <button 
+              type="submit"
+              disabled={!quickAmount}
+              style={{
+                padding: '0 var(--spacing-md)',
+                borderRadius: 'var(--radius-md)',
+                background: 'var(--text-primary)',
+                color: 'var(--bg-primary)',
+                fontWeight: 600,
+                opacity: quickAmount ? 1 : 0.5,
+                transition: 'all var(--transition-fast)'
+              }}
+            >
+              Simpan
+            </button>
+          </div>
+          
+          {/* Quick Selectors */}
+          <div style={{ display: 'flex', gap: 'var(--spacing-sm)' }}>
+            <select
+              value={quickCategoryId}
+              onChange={(e) => setQuickCategoryId(e.target.value)}
+              style={{
+                flex: 1,
+                minWidth: 0,
+                background: 'var(--bg-surface)',
+                border: '1px solid var(--border-color)',
+                borderRadius: 'var(--radius-md)',
+                padding: '0 var(--spacing-sm)',
+                fontSize: 'var(--font-sm)',
+                color: 'var(--text-secondary)',
+                fontWeight: 600,
+              }}
+            >
+              {categories?.filter(c => c.type === quickType || c.type === 'both').map(c => (
+                <option key={c.id} value={c.id}>
+                  {c.icon} {c.name}
+                </option>
+              ))}
+            </select>
+
+            <select
+              value={quickAccountId}
+              onChange={(e) => setQuickAccountId(e.target.value)}
+              style={{
+                flex: 1,
+                minWidth: 0,
+                background: 'var(--bg-surface)',
+                border: '1px solid var(--border-color)',
+                borderRadius: 'var(--radius-md)',
+                padding: '0 var(--spacing-sm)',
+                fontSize: 'var(--font-sm)',
+                color: 'var(--text-secondary)',
+                fontWeight: 600,
+              }}
+            >
+              {accounts?.map(a => (
+                <option key={a.id} value={a.id}>
+                  {a.icon} {a.name}
+                </option>
+              ))}
+            </select>
+          </div>
         </form>
       </div>
 
