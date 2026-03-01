@@ -211,6 +211,7 @@ export default function Dashboard() {
             onChange={(e) => setQuickAmount(e.target.value.replace(/\D/g, ''))}
             style={{ 
               flex: 1, 
+              minWidth: 0,
               background: 'var(--bg-surface)', 
               border: '1px solid var(--border-color)', 
               borderRadius: 'var(--radius-md)', 
@@ -225,7 +226,7 @@ export default function Dashboard() {
             type="submit"
             disabled={!quickAmount}
             style={{
-              padding: '0 var(--spacing-lg)',
+              padding: '0 var(--spacing-md)',
               borderRadius: 'var(--radius-md)',
               background: 'var(--text-primary)',
               color: 'var(--bg-primary)',
